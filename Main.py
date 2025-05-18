@@ -12,11 +12,13 @@ music_on = True
 
 frames_left = [
     'mage_walk_left_1', 'mage_walk_left_2',
-    'mage_walk_left_3', 'mage_walk_left_4'
+    'mage_walk_left_3', 'mage_walk_left_4',
+    'mage_walk_left_5', 'mage_walk_left_6'
 ]
 frames_right = [
     'mage_walk_right_1', 'mage_walk_right_2',
-    'mage_walk_right_3', 'mage_walk_right_4'
+    'mage_walk_right_3', 'mage_walk_right_4',
+    'mage_walk_right_5', 'mage_walk_right_6'
 ]
 fireball_frames = [
     'fireball_1', 'fireball_2', 'fireball_3',
@@ -61,8 +63,22 @@ cooldown_frames = 30
 frames_since_last_shot = cooldown_frames
 
 mage = Actor(frames_right[0])
-mage.pos = 320, 240
+mage.x = 320
+mage.y = 240
 
+def is_tile_floor(x, y):
+    grid_x = int(x // TILE_SIZE)
+    grid_y = int(y // TILE_SIZE)
+    if 0 <= grid_y < len(map_data) and 0 <= grid_x < len(map_data[0]):
+        return map_data[grid_y][grid_x] != "W"
+    return False
+
+def can_move_to(x, y):
+    buffer = 20
+    return (is_tile_floor(x - buffer, y - buffer) and
+            is_tile_floor(x + buffer, y - buffer) and
+            is_tile_floor(x - buffer, y + buffer) and
+            is_tile_floor(x + buffer, y + buffer))
 
 class Projectile:
     def __init__(self, x, y, target_x, target_y):
@@ -175,25 +191,45 @@ def reset_game():
     enemies = []
     projectiles = []
     score = 0
-    mage.pos = 320, 240
+    mage.x = 320
+    mage.y = 240
 
 
 button_start = Rect((220, 150), (200, 50))
 button_sound = Rect((220, 230), (200, 50))
-button_exit = Rect((220, 310), (200, 50))
+button_exit = Rect((220, 390), (200, 50))
+button_how_to_play = Rect((220, 310), (200, 50))
+box_how = Rect((220, 50), (200, 50))
+box_texthow = Rect((70, 150), (500, 200))
+button_back = Rect((30, 50), (80, 30))
 
 
 def draw_menu():
     screen.clear()
-    title_area = Rect(0, 50, WIDTH, 50)
-    screen.draw.textbox("Roguelike Game - Menu", title_area, color="white")
+    title_area = Rect(0, 50, WIDTH, 30)
+    screen.draw.textbox("Fire Magician: Against Ghosts", title_area, color="white")
+
     screen.draw.filled_rect(button_start, "darkblue")
-    screen.draw.textbox("Start Game", button_start, color="white")
+    screen.draw.text("Start Game", center=button_start.center, fontsize=30, color="white")
+
     screen.draw.filled_rect(button_sound, "darkblue")
     text_sound = "Sound: ON" if music_on else "Sound: OFF"
-    screen.draw.textbox(text_sound, button_sound, color="white")
+    screen.draw.text(text_sound, center=button_sound.center, fontsize=25, color="white")
+
+    screen.draw.filled_rect(button_how_to_play, "darkblue")
+    screen.draw.text("How to Play", center=button_how_to_play.center, fontsize=25, color="white")
+
     screen.draw.filled_rect(button_exit, "darkblue")
-    screen.draw.textbox("Exit", button_exit, color="white")
+    screen.draw.text("Exit", center=button_exit.center, fontsize=30, color="white")
+
+def draw_how():
+    screen.clear()
+    texthow = "Move with WASD, aim with your mouse, and click to shoot fireballs. Dodge the enemies, score as many points as you can, and see how long you can survive. It's an endless challenge — have fun!"
+    screen.draw.filled_rect(box_how, "darkblue")
+    screen.draw.text("How to Play", center=box_how.center,fontsize=40, color="white")
+    screen.draw.textbox(texthow, box_texthow, color="white")
+    screen.draw.filled_rect(button_back, "darkblue")
+    screen.draw.text("Back", center=button_back.center, fontsize=30, color="white")
 
 
 def draw_game():
@@ -213,6 +249,8 @@ def draw_game():
 def draw():
     if state == "menu":
         draw_menu()
+    elif state == "how":
+        draw_how()
     elif state == "game":
         draw_game()
 
@@ -228,21 +266,28 @@ def update():
     moving = False
     key_pressed = None
 
+    new_x = mage.x
+    new_y = mage.y
+
     if keyboard.a:
-        mage.x -= speed
+        new_x -= speed
         key_pressed = 'left'
     if keyboard.d:
-        mage.x += speed
+        new_x += speed
         key_pressed = 'right'
     if keyboard.w:
-        mage.y -= speed
+        new_y -= speed
         key_pressed = 'up'
     if keyboard.s:
-        mage.y += speed
+        new_y += speed
         key_pressed = 'down'
 
-    if key_pressed:
+    if can_move_to(new_x, new_y):
+        mage.x = new_x
+        mage.y = new_y
         moving = True
+
+    if key_pressed:
         if key_pressed in ['left', 'right'] and key_pressed != last_direction:
             current_frame = 0
             frame_count = 0
@@ -293,7 +338,12 @@ def on_mouse_down(pos):
             play_music()
         elif button_exit.collidepoint(pos):
             exit()
-
+        elif button_how_to_play.collidepoint(pos):
+            state = "how"
+            draw_how()
+    if state == "how":
+        if button_back.collidepoint(pos):
+            state = "menu"
     elif state == "game":
         if frames_since_last_shot >= cooldown_frames:
             if music_on:
